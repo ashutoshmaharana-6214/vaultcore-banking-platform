@@ -1,0 +1,17 @@
+$kind: http-request
+description: Transfer is committed in PostgreSQL; both account-balance cache entries are evicted after commit.
+url: http://localhost:8080/api/transfers
+method: POST
+headers:
+  Content-Type: application/json
+  Idempotency-Key: postman-transfer-001
+body:
+  type: text
+  content: '{"fromAccount":"{{sourceAccount}}","toAccount":"{{targetAccount}}","amount":250.00}'
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('Transfer completed', () => pm.response.to.have.status(201));
+      pm.test('Transaction status is completed', () => pm.expect(pm.response.json().status).to.eql('COMPLETED'));
+    language: text/javascript
+order: 4000

@@ -1,0 +1,11 @@
+{
+  "info": {"name": "Digital Banking Payment System", "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"},
+  "variable": [{"key":"baseUrl","value":"http://localhost:8080"},{"key":"sourceAccount","value":"ASHU00000001"},{"key":"targetAccount","value":"ASHU00000002"}],
+  "item": [
+    {"name":"Create source account","request":{"method":"POST","header":[{"key":"Content-Type","value":"application/json"}],"url":"{{baseUrl}}/api/accounts","body":{"mode":"raw","raw":"{\"accountNumber\":\"{{sourceAccount}}\",\"holderName\":\"Ashutosh\",\"openingBalance\":5000.00}"}},"event":[{"listen":"test","script":{"exec":["pm.test('Account created', () => pm.response.to.have.status(201));"]}}]},
+    {"name":"Create destination account","request":{"method":"POST","header":[{"key":"Content-Type","value":"application/json"}],"url":"{{baseUrl}}/api/accounts","body":{"mode":"raw","raw":"{\"accountNumber\":\"{{targetAccount}}\",\"holderName\":\"Test Receiver\",\"openingBalance\":1000.00}"}},"event":[{"listen":"test","script":{"exec":["pm.test('Account created', () => pm.response.to.have.status(201));"]}}]},
+    {"name":"Get account (Redis cache) ","request":{"method":"GET","url":"{{baseUrl}}/api/accounts/{{sourceAccount}}"},"event":[{"listen":"test","script":{"exec":["pm.test('Balance lookup succeeds', () => pm.response.to.have.status(200));","pm.test('Balance is present', () => pm.expect(pm.response.json()).to.have.property('balance'));"]}}]},
+    {"name":"Transfer funds","request":{"method":"POST","header":[{"key":"Content-Type","value":"application/json"}],"url":"{{baseUrl}}/api/transfers","body":{"mode":"raw","raw":"{\"fromAccount\":\"{{sourceAccount}}\",\"toAccount\":\"{{targetAccount}}\",\"amount\":250.00}"},"description":"Transfer is committed in PostgreSQL; both account-balance cache entries are evicted after commit."},"event":[{"listen":"test","script":{"exec":["pm.test('Transfer completed', () => pm.response.to.have.status(201));","pm.test('Transaction status is completed', () => pm.expect(pm.response.json().status).to.eql('COMPLETED'));"]}}]},
+    {"name":"Get transaction history","request":{"method":"GET","url":"{{baseUrl}}/api/accounts/{{sourceAccount}}/transactions"},"event":[{"listen":"test","script":{"exec":["pm.test('History returned', () => pm.response.to.have.status(200));"]}}]}
+  ]
+}

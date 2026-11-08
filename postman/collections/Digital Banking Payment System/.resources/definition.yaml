@@ -1,0 +1,6 @@
+$kind: collection
+description: ""
+variables:
+  baseUrl: http://localhost:8080
+  sourceAccount: ASHU00000001
+  targetAccount: ASHU00000002

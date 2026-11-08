@@ -1,0 +1,13 @@
+$kind: http-request
+url: "{{baseUrl}}/api/accounts"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: '{"accountNumber":"{{targetAccount}}","holderName":"Test Receiver","openingBalance":1000.00}'
+scripts:
+  - type: afterResponse
+    code: pm.test('Account created', () => pm.response.to.have.status(201));
+    language: text/javascript
+order: 2000

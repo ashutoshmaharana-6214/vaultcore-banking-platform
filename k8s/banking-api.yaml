@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: banking-api, namespace: banking}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: banking-api}}
+  template:
+    metadata: {labels: {app: banking-api}}
+    spec:
+      containers:
+        - name: banking-api
+          image: digital-banking-payment-system:latest
+          imagePullPolicy: IfNotPresent
+          ports: [{containerPort: 8080}]
+
+          env:
+            - name: REDIS_HOST
+              value: "redis"
+            - name: REDIS_PORT
+              value: "6379"
+            - name: DB_URL
+              value: "jdbc:postgresql://postgres:5432/banking"
+            - name: DB_USERNAME
+              value: "banking"
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: banking-db-secret
+                  key: DB_PASSWORD
+
+          readinessProbe: {httpGet: {path: /actuator/health/readiness, port: 8080}, initialDelaySeconds: 20, periodSeconds: 10}
+          livenessProbe: {httpGet: {path: /actuator/health/liveness, port: 8080}, initialDelaySeconds: 30, periodSeconds: 15}
+          resources: {requests: {cpu: 200m, memory: 256Mi}, limits: {cpu: "1", memory: 768Mi}}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: banking-api, namespace: banking}
+spec:
+  selector: {app: banking-api}
+  ports: [{port: 8080, targetPort: 8080}]
+  type: ClusterIP

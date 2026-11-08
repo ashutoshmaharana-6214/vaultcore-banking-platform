@@ -1,0 +1,13 @@
+# Use this workspace to collaborate
+workspace:
+  id: 0bbc6f99-ec13-4383-846d-acaa1a1218ee
+
+cloudResources:
+  collections:
+    ../postman/collections/Digital Banking Payment System: 135f30fe-19d2-425d-812e-8b5c3516683e
+
+# All resources in the `postman/` folder are automatically registered in Local View.
+# Point to additional files outside the `postman/` folder to register them individually. Example:
+#localResources:
+#  collections:
+#    - ../tests/E2E Test Collection/

@@ -1,0 +1,10 @@
+$kind: http-request
+url: http://localhost:8080/api/accounts/ASHU00000001
+method: GET
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('Balance lookup succeeds', () => pm.response.to.have.status(200));
+      pm.test('Balance is present', () => pm.expect(pm.response.json()).to.have.property('balance'));
+    language: text/javascript
+order: 3000
