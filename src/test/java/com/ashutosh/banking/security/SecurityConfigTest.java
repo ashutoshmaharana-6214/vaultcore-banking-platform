@@ -19,7 +19,7 @@ class SecurityConfigTest {
                 .issuer(issuer)
                 .subject("user@example.com")
                 .audience(audience)
-                .issuedAt(Instant.now().minusSeconds(1))
+                .issuedAt(Instant.now().minusSeconds(3600))
                 .expiresAt(expiration)
                 .build();
         return config.jwtEncoder(key).encode(JwtEncoderParameters.from(
