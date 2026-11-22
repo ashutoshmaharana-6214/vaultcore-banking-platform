@@ -114,7 +114,7 @@ public class SandboxFundingService {
         treasury.debit(FUNDING_AMOUNT);
         customer.credit(FUNDING_AMOUNT);
         BankTransaction tx = transfers.save(new BankTransaction(
-                "SEED-" + UUID.randomUUID(), TREASURY_ACCOUNT, destination, FUNDING_AMOUNT, key));
+                "SEED-" + UUID.randomUUID().toString().replace("-", ""), TREASURY_ACCOUNT, destination, FUNDING_AMOUNT, key));
         postings.save(new LedgerPosting(
                 tx.getReference(), TREASURY_ACCOUNT, LedgerPosting.EntryType.DEBIT, FUNDING_AMOUNT));
         postings.save(new LedgerPosting(
