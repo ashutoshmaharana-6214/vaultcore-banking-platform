@@ -1,0 +1,9 @@
+# USE WITH: docker compose -f docker-compose.yml -f docker-compose.sandbox.yml -p vaultcore-sandbox
+# Separate project name = separate volume. Never point this service at production data.
+services:
+  postgres:
+    environment:
+      POSTGRES_DB: banking_sandbox
+  banking-api:
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/banking_sandbox

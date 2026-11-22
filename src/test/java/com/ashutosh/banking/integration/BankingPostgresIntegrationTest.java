@@ -8,6 +8,10 @@ import com.ashutosh.banking.repository.BankTransactionRepository;
 import com.ashutosh.banking.repository.LedgerPostingRepository;
 import com.ashutosh.banking.entity.LedgerPosting;
 import com.ashutosh.banking.service.BankingService;
+import com.ashutosh.banking.sandbox.SandboxFundingService;
+import com.ashutosh.banking.entity.CustomerUser;
+import com.ashutosh.banking.repository.CustomerUserRepository;
+import org.springframework.test.context.ActiveProfiles;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -27,6 +31,7 @@ import java.util.concurrent.TimeUnit;
 import static org.junit.jupiter.api.Assertions.*;
 
 @Testcontainers
+@ActiveProfiles("sandbox-seed")
 @SpringBootTest(properties = {
         "vaultcore.jwt.secret=0123456789abcdef0123456789abcdef",
         "spring.jpa.hibernate.ddl-auto=validate"
@@ -60,6 +65,12 @@ class BankingPostgresIntegrationTest {
 
     @Autowired
     private LedgerPostingRepository ledgerPostings;
+
+    @Autowired
+    private SandboxFundingService sandboxFunding;
+
+    @Autowired
+    private CustomerUserRepository users;
 
     private String newAccountNumber() {
         return "T" + UUID.randomUUID().toString().replace("-", "").substring(0, 14);
@@ -191,6 +202,33 @@ class BankingPostgresIntegrationTest {
         } finally {
             workers.shutdownNow();
         }
+    }
+
+
+    @Test
+    void sandboxFundingIsBalancedAndIdempotent() {
+        String user = "seed-" + UUID.randomUUID() + "@example.com";
+        users.saveAndFlush(new CustomerUser(user, "synthetic-test-hash"));
+        sandboxFunding.ensureTreasury();
+        sandboxFunding.provisionPair(1, user);
+
+        String first = sandboxFunding.fundSource(1, user);
+        String replay = sandboxFunding.fundSource(1, user);
+        assertEquals(first, replay);
+
+        var source = accounts.findByAccountNumber(SandboxFundingService.sourceNumber(1)).orElseThrow();
+        var treasury = accounts.findByAccountNumber(SandboxFundingService.TREASURY_ACCOUNT).orElseThrow();
+        assertEquals(0, source.getBalance().compareTo(new BigDecimal("100.00")));
+        assertEquals(0, treasury.getBalance().compareTo(new BigDecimal("-100.00")));
+        assertEquals(Account.AccountType.SYSTEM, treasury.getAccountType());
+        assertEquals(2, ledgerPostings.findByTransactionReferenceOrderByIdAsc(first).size());
+        assertEquals(1, transactions.findByIdempotencyKey("sandbox-funding-v1-1").stream().count());
+
+        // A customer cannot submit a transfer TO the system treasury.
+        assertThrows(ApiException.class, () -> service.transfer(
+                new TransferRequest(SandboxFundingService.sourceNumber(1),
+                        SandboxFundingService.TREASURY_ACCOUNT, BigDecimal.ONE),
+                "must-reject-" + UUID.randomUUID(), user));
     }
 
 }
