@@ -48,7 +48,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
             response.setHeader("X-RateLimit-Limit", String.valueOf(limit));
             response.setHeader("X-RateLimit-Window", WINDOW_SECONDS + " seconds");
             if (count > limit) {
-                response.setStatus(HttpServletResponse.SC_TOO_MANY_REQUESTS);
+                response.setStatus(429);
                 response.setContentType("application/json");
                 response.getWriter().write("{\"error\":\"Rate limit exceeded\"}");
                 return;
