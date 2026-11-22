@@ -111,4 +111,86 @@ class BankingPostgresIntegrationTest {
         assertEquals(0, accounts.findByAccountNumber(from).orElseThrow().getBalance()
                 .compareTo(new BigDecimal("100.00")));
     }
+
+    @Test
+    void thirtyTwoParallelTransfersAcrossIndependentAccountsPreserveLedger() throws Exception {
+        final int transferCount = 32;
+        final String owner = "parallel-load@example.com";
+        java.util.List<TransferRequest> requests = new java.util.ArrayList<>();
+        for (int i = 0; i < transferCount; i++) {
+            String source = newAccountNumber();
+            String destination = newAccountNumber();
+            accounts.saveAndFlush(new Account(source, "Load Source", new BigDecimal("100.00"), owner));
+            accounts.saveAndFlush(new Account(destination, "Load Destination", BigDecimal.ZERO, owner));
+            requests.add(new TransferRequest(source, destination, new BigDecimal("10.00")));
+        }
+
+        var workers = Executors.newFixedThreadPool(8);
+        try {
+            java.util.List<java.util.concurrent.Future<com.ashutosh.banking.dto.TransferResponse>> results =
+                    new java.util.ArrayList<>();
+            for (int i = 0; i < transferCount; i++) {
+                final int index = i;
+                results.add(workers.submit(() -> service.transfer(requests.get(index),
+                        "parallel-" + UUID.randomUUID(), owner)));
+            }
+
+            for (int i = 0; i < transferCount; i++) {
+                var response = results.get(i).get(45, TimeUnit.SECONDS);
+                var request = requests.get(i);
+                assertEquals("COMPLETED", response.status());
+                assertEquals(0, accounts.findByAccountNumber(request.fromAccount())
+                        .orElseThrow().getBalance().compareTo(new BigDecimal("90.00")));
+                assertEquals(0, accounts.findByAccountNumber(request.toAccount())
+                        .orElseThrow().getBalance().compareTo(new BigDecimal("10.00")));
+
+                var postings = ledgerPostings.findByTransactionReferenceOrderByIdAsc(response.reference());
+                assertEquals(2, postings.size(), "Every successful transfer needs two journal postings");
+                assertEquals(1, postings.stream()
+                        .filter(p -> p.getEntryType() == LedgerPosting.EntryType.DEBIT
+                                && p.getAccountNumber().equals(request.fromAccount())
+                                && p.getAmount().compareTo(request.amount()) == 0).count());
+                assertEquals(1, postings.stream()
+                        .filter(p -> p.getEntryType() == LedgerPosting.EntryType.CREDIT
+                                && p.getAccountNumber().equals(request.toAccount())
+                                && p.getAmount().compareTo(request.amount()) == 0).count());
+            }
+        } finally {
+            workers.shutdownNow();
+        }
+    }
+
+    @Test
+    void concurrentTransfersOnSameAccountsNeverOverdrawOrLosePostings() throws Exception {
+        final int transferCount = 12;
+        final String owner = "contended-load@example.com";
+        String from = newAccountNumber();
+        String to = newAccountNumber();
+        accounts.saveAndFlush(new Account(from, "Contended Source", new BigDecimal("20.00"), owner));
+        accounts.saveAndFlush(new Account(to, "Contended Destination", BigDecimal.ZERO, owner));
+
+        var workers = Executors.newFixedThreadPool(6);
+        try {
+            java.util.List<java.util.concurrent.Future<com.ashutosh.banking.dto.TransferResponse>> results =
+                    new java.util.ArrayList<>();
+            for (int i = 0; i < transferCount; i++) {
+                final String idempotencyKey = "contended-" + UUID.randomUUID();
+                results.add(workers.submit(() -> service.transfer(
+                        new TransferRequest(from, to, BigDecimal.ONE), idempotencyKey, owner)));
+            }
+
+            for (var result : results) {
+                var tx = result.get(45, TimeUnit.SECONDS);
+                assertEquals("COMPLETED", tx.status());
+                assertEquals(2, ledgerPostings.findByTransactionReferenceOrderByIdAsc(tx.reference()).size());
+            }
+            assertEquals(0, accounts.findByAccountNumber(from).orElseThrow().getBalance()
+                    .compareTo(new BigDecimal("8.00")));
+            assertEquals(0, accounts.findByAccountNumber(to).orElseThrow().getBalance()
+                    .compareTo(new BigDecimal("12.00")));
+        } finally {
+            workers.shutdownNow();
+        }
+    }
+
 }
