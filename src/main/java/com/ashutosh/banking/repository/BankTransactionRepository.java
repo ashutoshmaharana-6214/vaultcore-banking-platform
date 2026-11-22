@@ -6,4 +6,5 @@ import java.util.Optional;
 public interface BankTransactionRepository extends JpaRepository<BankTransaction, Long> {
     List<BankTransaction> findTop50ByFromAccountOrToAccountOrderByCreatedAtDesc(String from, String to);
 Optional<BankTransaction> findByIdempotencyKey(String idempotencyKey);
+    Optional<BankTransaction> findByReference(String reference);
 }

@@ -5,6 +5,8 @@ import com.ashutosh.banking.entity.Account;
 import com.ashutosh.banking.exception.ApiException;
 import com.ashutosh.banking.repository.AccountRepository;
 import com.ashutosh.banking.repository.BankTransactionRepository;
+import com.ashutosh.banking.repository.LedgerPostingRepository;
+import com.ashutosh.banking.entity.LedgerPosting;
 import com.ashutosh.banking.service.BankingService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,7 +29,7 @@ import static org.junit.jupiter.api.Assertions.*;
 @Testcontainers
 @SpringBootTest(properties = {
         "vaultcore.jwt.secret=0123456789abcdef0123456789abcdef",
-        "spring.jpa.hibernate.ddl-auto=create-drop"
+        "spring.jpa.hibernate.ddl-auto=validate"
 })
 class BankingPostgresIntegrationTest {
     @Container
@@ -56,6 +58,9 @@ class BankingPostgresIntegrationTest {
     @Autowired
     private BankTransactionRepository transactions;
 
+    @Autowired
+    private LedgerPostingRepository ledgerPostings;
+
     private String newAccountNumber() {
         return "T" + UUID.randomUUID().toString().replace("-", "").substring(0, 14);
     }
@@ -83,6 +88,11 @@ class BankingPostgresIntegrationTest {
             assertEquals(0, accounts.findByAccountNumber(to).orElseThrow().getBalance()
                     .compareTo(new BigDecimal("225.00")));
             assertEquals(1, transactions.findByIdempotencyKey(key).stream().count());
+            var entries = ledgerPostings.findByTransactionReferenceOrderByIdAsc(first.reference());
+            assertEquals(2, entries.size());
+            assertEquals(1, entries.stream().filter(e -> e.getEntryType() == LedgerPosting.EntryType.DEBIT).count());
+            assertEquals(1, entries.stream().filter(e -> e.getEntryType() == LedgerPosting.EntryType.CREDIT).count());
+            assertEquals(0, entries.get(0).getAmount().compareTo(entries.get(1).getAmount()));
         } finally {
             pool.shutdownNow();
         }

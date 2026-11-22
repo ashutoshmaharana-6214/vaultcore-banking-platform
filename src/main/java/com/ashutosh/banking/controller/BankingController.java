@@ -2,6 +2,7 @@ package com.ashutosh.banking.controller;
 
 import com.ashutosh.banking.dto.*;
 import com.ashutosh.banking.service.BankingService;
+import com.ashutosh.banking.service.LedgerReconciliationService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -14,9 +15,11 @@ import java.util.List;
 @RequestMapping("/api")
 public class BankingController {
     private final BankingService service;
+    private final LedgerReconciliationService reconciliation;
 
-    public BankingController(BankingService service) {
+    public BankingController(BankingService service, LedgerReconciliationService reconciliation) {
         this.service = service;
+        this.reconciliation = reconciliation;
     }
 
     @PostMapping("/accounts")
@@ -37,6 +40,11 @@ public class BankingController {
                                      @RequestHeader("Idempotency-Key") String idempotencyKey,
                                      @AuthenticationPrincipal Jwt jwt) {
         return service.transfer(request, idempotencyKey, jwt.getSubject());
+    }
+
+    @GetMapping("/transfers/{reference}/reconciliation")
+    public LedgerReconciliationResponse reconciliation(@PathVariable String reference, @AuthenticationPrincipal Jwt jwt) {
+        return reconciliation.reconcile(reference, jwt.getSubject());
     }
 
     @GetMapping("/accounts/{accountNumber}/transactions")
