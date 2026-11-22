@@ -29,6 +29,10 @@ vaultcore:
   jwt:
     secret: ${JWT_SECRET}
     issuer: ${JWT_ISSUER:vaultcore-local}
+  sms:
+    enabled: ${SMS_ENABLED:false}
+    poll-ms: 3000
+    stale-poll-ms: 120000
 management:
   endpoints:
     web:
@@ -44,8 +48,3 @@ springdoc:
   swagger-ui:
     enabled: false
 
-vaultcore:
-  sms:
-    enabled: ${SMS_ENABLED:false}
-    poll-ms: 3000
-    stale-poll-ms: 120000
