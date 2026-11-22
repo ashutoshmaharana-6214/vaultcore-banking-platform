@@ -7,6 +7,7 @@ import com.ashutosh.banking.entity.BankTransaction;
 import com.ashutosh.banking.exception.ApiException;
 import com.ashutosh.banking.repository.AccountRepository;
 import com.ashutosh.banking.repository.BankTransactionRepository;
+import com.ashutosh.banking.repository.LedgerPostingRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.cache.Cache;
@@ -23,6 +24,7 @@ class BankingServiceTest {
     private BankTransactionRepository transactions;
     private Cache cache;
     private BankingService service;
+    private LedgerPostingRepository ledgerPostings;
 
     @BeforeEach
     void setUp() {
@@ -32,7 +34,8 @@ class BankingServiceTest {
         cache = mock(Cache.class);
         when(cacheManager.getCache("account-balance")).thenReturn(cache);
         when(transactions.findByIdempotencyKey(anyString())).thenReturn(Optional.empty());
-        service = new BankingService(accounts, transactions, cacheManager);
+        ledgerPostings = mock(LedgerPostingRepository.class);
+        service = new BankingService(accounts, transactions, cacheManager, ledgerPostings);
     }
 
     private void setupAccounts(Account source, Account target) {
@@ -55,6 +58,7 @@ class BankingServiceTest {
         assertEquals("COMPLETED", result.status());
         verify(cache).evict("ACCOUNT0001:" + OWNER);
         verify(cache).evict("ACCOUNT0002:other@example.com");
+        verify(ledgerPostings, times(2)).save(any(com.ashutosh.banking.entity.LedgerPosting.class));
     }
 
     @Test
@@ -67,6 +71,7 @@ class BankingServiceTest {
                 "ACCOUNT0001", "ACCOUNT0002", new BigDecimal("10.00")), "transfer-002", OWNER));
         assertEquals(0, new BigDecimal("500.00").compareTo(source.getBalance()));
         verify(transactions, never()).save(any());
+        verify(ledgerPostings, never()).save(any());
     }
 
     @Test
@@ -95,6 +100,7 @@ class BankingServiceTest {
         assertEquals(first.reference(), second.reference());
         assertEquals(0, new BigDecimal("450.00").compareTo(source.getBalance()));
         verify(transactions, times(1)).save(any(BankTransaction.class));
+        verify(ledgerPostings, times(2)).save(any(com.ashutosh.banking.entity.LedgerPosting.class));
     }
 
     @Test

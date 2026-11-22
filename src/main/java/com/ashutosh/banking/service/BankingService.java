@@ -20,12 +20,14 @@ public class BankingService {
     private final AccountRepository accounts;
     private final BankTransactionRepository transactions;
     private final CacheManager cacheManager;
+    private final LedgerPostingRepository ledgerPostings;
 
     public BankingService(AccountRepository accounts, BankTransactionRepository transactions,
-                          CacheManager cacheManager) {
+                          CacheManager cacheManager, LedgerPostingRepository ledgerPostings) {
         this.accounts = accounts;
         this.transactions = transactions;
         this.cacheManager = cacheManager;
+        this.ledgerPostings = ledgerPostings;
     }
 
     @Transactional
@@ -97,6 +99,9 @@ public class BankingService {
         target.credit(amount);
         BankTransaction tx = transactions.save(new BankTransaction(
                 "TXN-" + UUID.randomUUID(), request.fromAccount(), request.toAccount(), amount, idempotencyKey));
+
+        ledgerPostings.save(new LedgerPosting(tx.getReference(), source.getAccountNumber(), LedgerPosting.EntryType.DEBIT, amount));
+        ledgerPostings.save(new LedgerPosting(tx.getReference(), target.getAccountNumber(), LedgerPosting.EntryType.CREDIT, amount));
 
         evictAfterCommit(
                 source.getAccountNumber() + ":" + source.getOwnerEmail(),
