@@ -1,59 +1,77 @@
-# Digital Banking & Payment System
+# VaultCore — Digital Banking API (backend hardening)
 
-A Java 21 / Spring Boot REST API demonstrating core banking workflows with PostgreSQL as the system of record and Redis for low-latency caching and API rate limiting.
+Java 21 + Spring Boot 3.4.x + PostgreSQL + Redis. This is an **engineering portfolio sandbox**, not a real bank. This backend security milestone adds customer registration/login, hashed credentials, short-lived signed access tokens, authorization-bound account access, a fail-closed API rate limiter and safer demo-account funding rules.
 
-## Implemented in this starter
-- Create accounts and retrieve account details.
-- Transfer funds atomically in a PostgreSQL transaction; pessimistic row locks are acquired in a deterministic account-number order to reduce deadlocks.
-- Transaction history (latest 50 records involving an account).
-- Redis-backed account read cache (30-second TTL).
-- Cache entries for both accounts are evicted only after a successful database commit, preventing stale cached balances after transfers.
-- Redis-backed per-IP/per-endpoint rate limiting (60 requests per minute). If Redis is unavailable, this starter currently fails open and adds a response header; change this policy for production financial systems.
-- Docker Compose for API, PostgreSQL and Redis; OpenAPI UI; health endpoints; Postman collection; initial Kubernetes manifests.
+> **Important**: This branch is a security foundation, not a production-ready financial service. Do not deploy publicly without the release blockers in [docs/BACKEND-SECURITY.md](docs/BACKEND-SECURITY.md).
 
-## Run locally
-Requires Java 21, Maven 3.9+, Docker Desktop and Docker Compose.
+## Run locally (requires Docker / Compose)
 
 ```bash
+cp .env.example .env
+# Replace DB_PASSWORD with a locally generated strong value in .env.
+# Add JWT_SECRET to .env using a newly generated random secret:
+printf '\nJWT_SECRET=%s\n' "$(openssl rand -hex 32)" >> .env
 docker compose up --build
 ```
 
-API: http://localhost:8080
-Swagger UI: http://localhost:8080/swagger-ui.html
-Health: http://localhost:8080/actuator/health
-
-## Run tests
-```bash
-mvn clean verify
-```
-
-## Redis behavior
-- Cache name: `account-balance`; key: account number; TTL: 30 seconds.
-- `GET /api/accounts/{accountNumber}` is cacheable.
-- Successful `POST /api/transfers` evicts both account keys after transaction commit.
-- API paths under `/api/` are limited to 60 requests per IP and endpoint per 60-second window.
-- Redis is not authoritative for money. PostgreSQL transaction boundaries and row locks protect balance updates.
+Do not add secrets to GitHub. The app intentionally fails startup if JWT_SECRET is missing or too short. Redis and PostgreSQL are not exposed on host ports by default; the API listens only on 127.0.0.1:8080 for local Compose.
 
 ## API examples
-Create an account:
+
+Register (choose a real test password of at least 12 characters):
+```bash
+curl -i http://localhost:8080/api/auth/register \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"demo@example.com","password":"use-a-long-unique-test-password"}'
+```
+
+Log in:
+```bash
+curl -s http://localhost:8080/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"demo@example.com","password":"use-a-long-unique-test-password"}'
+```
+
+The login response contains a **15-minute Bearer token**. Supply it using `Authorization: Bearer <accessToken>` for all account/transfer/history endpoints. Keep tokens out of logs, commits, screenshots and browser localStorage.
+
+Create a demo account with a **zero** opening balance:
 ```http
 POST /api/accounts
+Authorization: Bearer <accessToken>
 Content-Type: application/json
 
-{"accountNumber":"ASHU00000001","holderName":"Ashutosh","openingBalance":5000.00}
+{"accountNumber":"DEMOACCOUNT01","holderName":"Demo Customer","openingBalance":0}
 ```
-Transfer:
+
+Transfer funds only from an account owned by the authenticated user:
 ```http
 POST /api/transfers
+Authorization: Bearer <accessToken>
+Idempotency-Key: stable-unique-key-for-this-transfer
 Content-Type: application/json
 
-{"fromAccount":"ASHU00000001","toAccount":"ASHU00000002","amount":250.00}
+{"fromAccount":"DEMOACCOUNT01","toAccount":"DEMOACCOUNT02","amount":25.00}
 ```
 
-Import `postman/Digital-Banking-API.postman_collection.json` into Postman. Run the two account-creation requests first, then balance lookup, transfer and history. Use unique account numbers if rerunning against a database with existing data.
+New accounts start at zero; **funding is deliberately unavailable through the public API**. Future controlled sandbox funding will be auditable; callers cannot mint balances by sending arbitrary opening amounts.
 
-## Kubernetes (starter manifests)
-The manifests in `k8s/` include Redis and the API. They assume a PostgreSQL Service named `postgres` already exists in the `banking` namespace and that the API image has been built and loaded into the cluster as `digital-banking-payment-system:latest`. They are a starting point, not a complete production deployment. For a real deployment, use Kubernetes Secrets, persistent volumes, managed PostgreSQL/Redis, TLS/Ingress, network policies and resource tuning.
+Other endpoints:
+- `GET /api/accounts/{accountNumber}` — owner only.
+- `GET /api/accounts/{accountNumber}/transactions` — owner only.
+- `GET /actuator/health` — local readiness check.
 
-## Important scope and security notes
-This is a portfolio learning project, not production banking software. Authentication/JWT, authorization, idempotency-key persistence, Kafka eventing, fraud rules, audit trails, distributed saga orchestration and full microservice decomposition are not yet implemented. Do not claim those features on a CV until they are added and tested. The demo Compose credentials are for local development only.
+## Tests
+
+```bash
+mvn -B clean verify
+```
+
+The backend preserves PostgreSQL transactional transfers, deterministic row locking, idempotency-key persistence, and owner-specific Redis balance cache keys. Rate-limiter counters use one Redis Lua script for atomic increment + expiry. When Redis is unavailable, protected API requests return 503 rather than failing open.
+
+## Deployment / migration caveats
+
+- `HIBERNATE_DDL_AUTO=update` is **local-only**. A database migration process and schema validation are required before any shared staging deployment.
+- Existing demo accounts have no owner assigned and intentionally **cannot be accessed** using a new customer's token. Do not claim they belong to a user.
+- Swagger/OpenAPI is disabled; avoid publishing operational endpoints.
+- The checked-in Kubernetes manifests and old Postman collection are starter artifacts, not hardened deployment instructions.
+- Use TLS, managed secrets, backups, audit trails, stronger user identity verification and enhanced fraud/idempotency resilience before any public service.
