@@ -43,3 +43,9 @@ springdoc:
     enabled: false
   swagger-ui:
     enabled: false
+
+vaultcore:
+  sms:
+    enabled: ${SMS_ENABLED:false}
+    poll-ms: 3000
+    stale-poll-ms: 120000
