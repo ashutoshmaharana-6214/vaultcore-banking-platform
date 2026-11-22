@@ -20,12 +20,14 @@ public class BankingService {
     private final AccountRepository accounts;
     private final BankTransactionRepository transactions;
     private final CacheManager cacheManager;
+    private final NotificationOutboxService notificationOutbox;
 
     public BankingService(AccountRepository accounts, BankTransactionRepository transactions,
-                          CacheManager cacheManager) {
+                          CacheManager cacheManager, NotificationOutboxService notificationOutbox) {
         this.accounts = accounts;
         this.transactions = transactions;
         this.cacheManager = cacheManager;
+        this.notificationOutbox = notificationOutbox;
     }
 
     @Transactional
@@ -98,6 +100,7 @@ public class BankingService {
         BankTransaction tx = transactions.save(new BankTransaction(
                 "TXN-" + UUID.randomUUID(), request.fromAccount(), request.toAccount(), amount, idempotencyKey));
 
+        notificationOutbox.enqueueTransferAlerts(tx.getReference(), source.getOwnerEmail(), target.getOwnerEmail());
         evictAfterCommit(
                 source.getAccountNumber() + ":" + source.getOwnerEmail(),
                 target.getAccountNumber() + ":" + target.getOwnerEmail());

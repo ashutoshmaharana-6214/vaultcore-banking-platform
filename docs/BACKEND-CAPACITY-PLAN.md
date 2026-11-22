@@ -53,3 +53,6 @@ Critical: PostgreSQL writes must remain strongly consistent, idempotent and seri
 - Need gated post-auth deposit simulation before meaningful transfer load testing.
 
 See `tests/performance/README.md` for controlled measurement commands. Security verification is aligned conceptually to OWASP ASVS 5.0; this is **not a security certification**.
+
+## New latency objective
+Target p95 under **50 ms for cached authenticated account reads** in a same-region controlled benchmark, with security and rate limits enabled. It is not a target for financial writes, OTP provider calls, or SMS provider delivery. Measure p50/p95/p99, throughput, environment, dataset, concurrency and load duration. This is an unverified SLO until demonstrated by published test results.

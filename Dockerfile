@@ -5,6 +5,6 @@ COPY src ./src
 RUN mvn -B -DskipTests package
 FROM eclipse-temurin:21-jre
 WORKDIR /app
-COPY --from=build /workspace/target/digital-banking-payment-system-0.1.0.jar app.jar
+COPY --from=build /workspace/target/digital-banking-payment-system-*.jar app.jar
 EXPOSE 8080
 ENTRYPOINT ["java","-jar","app.jar"]

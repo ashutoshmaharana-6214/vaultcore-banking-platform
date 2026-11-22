@@ -23,6 +23,7 @@ class BankingServiceTest {
     private BankTransactionRepository transactions;
     private Cache cache;
     private BankingService service;
+    private NotificationOutboxService notificationOutbox;
 
     @BeforeEach
     void setUp() {
@@ -32,7 +33,8 @@ class BankingServiceTest {
         cache = mock(Cache.class);
         when(cacheManager.getCache("account-balance")).thenReturn(cache);
         when(transactions.findByIdempotencyKey(anyString())).thenReturn(Optional.empty());
-        service = new BankingService(accounts, transactions, cacheManager);
+        notificationOutbox = mock(NotificationOutboxService.class);
+        service = new BankingService(accounts, transactions, cacheManager, notificationOutbox);
     }
 
     private void setupAccounts(Account source, Account target) {
