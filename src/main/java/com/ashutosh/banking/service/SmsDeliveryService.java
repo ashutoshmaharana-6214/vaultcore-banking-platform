@@ -28,21 +28,17 @@ public class SmsDeliveryService {
    switch(result){case "sent"->n.sent();case "suppressed"->n.suppressed();default->n.failed();}
   });
  }
- public void dispatch(Long id){
-  var claimed=claim(id);if(claimed.isEmpty())return;
-  SmsNotification n=claimed.get();
-  String result="failed";
+ public String submit(SmsNotification n){
   try{
    var user=users.findByEmail(n.getRecipientEmail());
    if(user.isEmpty()||!user.get().isSmsAlertsEnabled()
-       ||!n.getPhoneNumber().equals(user.get().getVerifiedPhoneNumber())){
-    result="suppressed";
-   }else{
-    provider.sendTransactionAlert(n.getPhoneNumber(),n.getBody());
-    result="sent";
-   }
+       ||!n.getPhoneNumber().equals(user.get().getVerifiedPhoneNumber()))return "suppressed";
+   provider.sendTransactionAlert(n.getPhoneNumber(),n.getBody());
+   return "sent";
   }catch(RuntimeException exception){
-   // Don't log phone numbers, message content, or credentials.
-  }finally{complete(id,result);}
+   // Never expose phone numbers, message content or credentials in logs.
+   return "failed";
+  }
  }
 }
+

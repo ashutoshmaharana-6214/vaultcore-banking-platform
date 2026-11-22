@@ -19,7 +19,13 @@ public class SmsOutboxScheduler {
  @Scheduled(fixedDelayString="${vaultcore.sms.poll-ms:3000}")
  public void dispatchDue(){
   if(!enabled)return;
-  alerts.findDueIds(Instant.now(),PageRequest.of(0,50)).forEach(delivery::dispatch);
+  for(Long id:alerts.findDueIds(Instant.now(),PageRequest.of(0,50))){
+   // Each claim and completion is a separate database transaction on the proxied service.
+   var claimed=delivery.claim(id);
+   if(claimed.isEmpty())continue;
+   String result=delivery.submit(claimed.get());
+   delivery.complete(id,result);
+  }
  }
  @Scheduled(fixedDelayString="${vaultcore.sms.stale-poll-ms:120000}")
  @Transactional public void releaseStale(){

@@ -81,6 +81,9 @@ public class TwilioMessagingClient {
         data.add("To", phone);
         data.add("MessagingServiceSid", messagingServiceSid);
         data.add("Body", message);
-        postForm("https://api.twilio.com/2010-04-01/Accounts/" + accountSid + "/Messages.json", data);
+        Map<?, ?> response = postForm("https://api.twilio.com/2010-04-01/Accounts/" + accountSid + "/Messages.json", data);
+        if(response == null || !(response.get("sid") instanceof String sid) || sid.isBlank()){
+            throw new IllegalStateException("SMS provider did not confirm message submission");
+        }
     }
 }
