@@ -7,6 +7,19 @@ import java.time.Instant;
 @Entity
 @Table(name = "accounts", uniqueConstraints = @UniqueConstraint(name = "uk_account_number", columnNames = "account_number"))
 public class Account {
+    public enum AccountType { CUSTOMER, SYSTEM }
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "account_type", nullable = false, length = 12)
+    private AccountType accountType;
+
+    public static Account systemAccount(String number) {
+        Account result = new Account(number, "Sandbox Clearing Account", BigDecimal.ZERO, null);
+        result.accountType = AccountType.SYSTEM;
+        return result;
+    }
+
+    public AccountType getAccountType() { return accountType; }
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
@@ -33,6 +46,7 @@ public class Account {
     protected Account() {}
 
     public Account(String accountNumber, String holderName, BigDecimal balance, String ownerEmail) {
+        this.accountType = AccountType.CUSTOMER;
         this.accountNumber = accountNumber;
         this.holderName = holderName;
         this.balance = balance;

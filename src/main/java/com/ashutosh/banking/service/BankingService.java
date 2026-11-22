@@ -75,7 +75,9 @@ public class BankingService {
 
         Account source = request.fromAccount().equals(first) ? a : b;
         Account target = request.toAccount().equals(first) ? a : b;
-        if (source.getOwnerEmail() == null || !source.getOwnerEmail().equals(requester)) {
+        if (source.getAccountType() != Account.AccountType.CUSTOMER
+                || target.getAccountType() != Account.AccountType.CUSTOMER
+                || source.getOwnerEmail() == null || !source.getOwnerEmail().equals(requester)) {
             throw new ApiException(HttpStatus.NOT_FOUND, "Account not found");
         }
 

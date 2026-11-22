@@ -12,3 +12,5 @@ target/
 *.p12
 *.jks
 src/main/resources.tmp
+
+tests/performance/transfer-fixtures.local.json
